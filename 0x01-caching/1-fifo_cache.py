@@ -1,60 +1,51 @@
-#!/usr/bin/env python3
-""" 1-fifo_cache Module """
+#!/usr/bin/python3
+"""FIFO Cache Replacement Implementation Class
+"""
+from threading import RLock
 
 BaseCaching = __import__('base_caching').BaseCaching
 
-        
-class LIFOCache(BaseCaching):
-    """
-    FIFOCache class
 
-    Implements the First-In-First-Out (FIFO) caching algorithm.
+class FIFOCache(BaseCaching):
     """
+    An implementation of FIFO(First In Fisrt Out) Cache
 
+    Attributes:
+        __keys (list): Stores cache keys in order of entry using `.append`
+        __rlock (RLock): Lock accessed resources to prevent race condition
+    """
     def __init__(self):
-        """ Initialize the FIFOCache object """
-
+        """ Instantiation method, sets instance attributes
+        """
         super().__init__()
-        self.stack = []
+        self.__keys = []
+        self.__rlock = RLock()
 
     def put(self, key, item):
+        """ Add an item in the cache
         """
-        Add an item to the cache
-
-        Args:
-            key: The key for the item.
-            item: The value of the item.
-
-        Return:
-            Nothing, If the key or item is None,
-            Otherwise, assigns item to key in cache_data dictionary.
-        """
-
-        if key is None or item is None:
-            return
-
-        self.cache_data[key] = item
-        self.stack.append(key)
-
-        if len(self.cache_data) > self.MAX_ITEMS:
-            discarded_key = self.stack.pop()
-            del self.cache_data[discarded_key]
-            print("DISCARD: {}".format(discarded_key))
+        if key is not None and item is not None:
+            keyOut = self._balance(key)
+            with self.__rlock:
+                self.cache_data.update({key: item})
+            if keyOut is not None:
+                print('DISCARD: {}'.format(keyOut))
 
     def get(self, key):
+        """ Get an item by key
         """
-        Get an item from the cache
+        with self.__rlock:
+            return self.cache_data.get(key, None)
 
-        Args:
-            key: The key of the item to retrieve.
-
-        Returns:
-            The value of key in the cache_data dictionary,
-            or None if key is None or does not exist
+    def _balance(self, keyIn):
+        """ Removes the oldest item from the cache at MAX size
         """
-
-        if key is None or key not in self.cache_data:
-            return None
-
-        return self.cache_data[key]
-
+        keyOut = None
+        with self.__rlock:
+            if keyIn not in self.__keys:
+                keysLength = len(self.__keys)
+                if len(self.cache_data) == BaseCaching.MAX_ITEMS:
+                    keyOut = self.__keys.pop(0)
+                    self.cache_data.pop(keyOut)
+                self.__keys.insert(keysLength, keyIn)
+        return keyOut
